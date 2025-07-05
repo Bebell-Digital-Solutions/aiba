@@ -125,7 +125,7 @@
         if (fileContext) {
             fullPrompt = `Please use the following context from user-uploaded files to inform your answer.\n---\nSTART OF FILE CONTEXT\n${fileContext}\nEND OF FILE CONTEXT\n---\nUser Prompt: ${message}`;
         }
-        return await chat.sendMessageStream({message: fullPrompt});
+        return await chat.sendMessageStream(fullPrompt);
     };
 
     const resetChat = () => {
@@ -196,23 +196,12 @@
     // --- FEATURE COMPONENTS ---
      const ApiKeyModal = ({ onSave, onDelete, onClose, currentKey }) => {
         const [key, setKey] = useState(currentKey || '');
-        const [error, setError] = useState('');
         
-        const handleSubmit = async (e) => {
+        const handleSubmit = (e) => {
           e.preventDefault();
           if (!key.trim()) return;
-          setError('');
-          try {
-            // Test the key before saving
-            const testAi = new GoogleGenAI({ apiKey: key.trim() });
-            const testModel = testAi.models.generateContent({model: 'gemini-2.5-flash-preview-04-17', contents: "hello"});
-            await testModel;
-            onSave(key.trim());
-            onClose();
-          } catch (err) {
-            console.error("API Key validation failed", err);
-            setError("Invalid API Key. Please check your key and try again.");
-          }
+          onSave(key.trim());
+          onClose();
         };
 
         const handleDelete = () => {
@@ -233,7 +222,6 @@
                         <div className="p-6">
                             <p className="text-gray-600 dark:text-gray-400 mb-6">Your Google Gemini API key is stored in your browser's local storage and is never sent to our servers.</p>
                             <input type="password" value={key} onChange={e => setKey(e.target.value)} placeholder="Paste your API key here" className="w-full h-12 px-4 rounded-lg bg-slate-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-pink" />
-                            {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
                             <div className="mt-4 text-sm text-gray-500 dark:text-gray-400">
                                 <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-brand-pink hover:underline">Get your API key from Google AI Studio</a>
                             </div>
@@ -297,7 +285,7 @@
         }, [messages]);
 
         return (
-            <div className="flex-1 overflow-y-auto px-4 pt-4 pb-48">
+            <div className="flex-1 overflow-y-auto px-4 pt-4 pb-4">
                 <div className="max-w-4xl mx-auto">
                     {messages.map(msg => <ChatMessage key={msg.id} message={msg} />)}
                     <div ref={chatEndRef} />
@@ -315,8 +303,8 @@
         </div>
     );
     
-    const Header = ({ onSuggestionClick, className }) => (
-        <header className={`px-4 pt-16 pb-8 sm:pt-24 lg:pt-28 ${className || ''}`}>
+    const Header = ({ onSuggestionClick }) => (
+        <header className={'flex-1 overflow-y-auto px-4 pt-16 pb-8 sm:pt-24 lg:pt-28'}>
             <div className="max-w-4xl mx-auto">
                 <div>
                     <h1 className="text-5xl sm:text-6xl font-semibold bg-clip-text text-transparent bg-gradient-to-r from-brand-pink to-purple-500">Hello, there</h1>
@@ -483,10 +471,15 @@
         }, []);
 
         const handleSaveApiKey = useCallback((key) => {
-            initializeGeminiService(key);
-            setApiKey(key);
-            localStorage.setItem('gemini-api-key', key);
-            setShowApiKeyModal(false);
+            try {
+                initializeGeminiService(key);
+                setApiKey(key);
+                localStorage.setItem('gemini-api-key', key);
+                setShowApiKeyModal(false);
+            } catch (e) {
+                console.error("Failed to initialize on save", e);
+                // This catch is for synchronous errors in initialization, not for async validation
+            }
         }, []);
         
         const handleDeleteApiKey = useCallback(() => {
@@ -543,9 +536,12 @@
 
         return (
             <>
-                <div className="flex flex-col h-screen max-h-screen bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200">
-                    {messages.length === 0 && <Header onSuggestionClick={handleSendMessage} />}
-                    <ChatView messages={messages} />
+                <div className="flex flex-col h-screen max-h-screen bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 pb-36 sm:pb-32">
+                    {messages.length === 0 ? (
+                        <Header onSuggestionClick={handleSendMessage} />
+                    ) : (
+                        <ChatView messages={messages} />
+                    )}
                     <TypingArea
                         onSendMessage={handleSendMessage}
                         isLoading={isLoading}
